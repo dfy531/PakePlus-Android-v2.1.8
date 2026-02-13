@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>设置</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+    body {
+      background: #f5f6f8;
+      color: #1d1d1f;
+      min-height: 100vh;
+      padding-top: 60px;
+      padding-bottom: 30px;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: #007aff;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .navbar h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px 16px 0;
+    }
+
+    .section-title {
+      font-size: 16px;
+      color: #666;
+      margin: 24px 0 12px;
+      padding-left: 8px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 17px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .btn.export { background: #e6f0ff; color: #007aff; }
+    .btn.import { background: #fff8e1; color: #ff9800; }
+    .btn.history { background: #f0f8ff; color: #2196f3; }
+    .btn.danger { background: #ffebee; color: #f44336; }
+
+    .history-list {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 12px;
+      max-height: 40vh;
+      overflow-y: auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .history-item {
+      padding: 8px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      border-bottom: 1px solid #eee;
+    }
+    .history-item:last-child {
+      border-bottom: none;
+    }
+    .empty {
+      text-align: center;
+      color: #999;
+      padding: 20px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 16px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    .tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: white;
+  display: flex;
+  border-top: 1px solid #e0e0e0;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  z-index: 90;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #888;
+  font-size: 12px;
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+
+.tab-item.active {
+  color: #007aff;
+}
+
+.tab-item div:first-child {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+  </style>
+</head>
+<body>
+
+<div class="navbar">
+  <h1>设置</h1>
+  <div style="width:60px;"></div>
+</div>
+
+<div class="container">
+  <div class="section-title">数据管理</div>
+  
+  <button class="btn export" onclick="exportData()">
+    📤 导出数据
+  </button>
+  
+  <button class="btn import" onclick="document.getElementById('importFile').click()">
+    📥 导入数据
+  </button>
+  <input type="file" id="importFile" accept=".json" onchange="importData(event)" />
+
+  <div class="section-title">操作记录</div>
+  <button class="btn history" onclick="toggleHistory()">
+    📜 查看操作日志
+  </button>
+  <div id="historyContainer" style="display:none;">
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <div class="section-title">危险操作</div>
+  <button class="btn danger" onclick="confirmClearAll()">
+    🗑️ 清空所有数据
+  </button>
+</div>
+
+<div class="toast" id="toast">操作成功</div>
+
+<!-- 底部导航栏 -->
+<div class="tab-bar">
+  <a href="index.html" class="tab-item active">
+    <div>🏠</div>
+    <div>首页</div>
+  </a>
+  <a href="settings.html" class="tab-item">
+    <div>⚙️</div>
+    <div>设置</div>
+  </a>
+</div>
+
+<script>
+  // ========== 工具函数 ==========
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  function goBack() {
+    window.location.href = 'index.html';
+  }
+
+  // ========== 数据读取 ==========
+  let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
+  let historyLog = JSON.parse(localStorage.getItem('bookmarkHistory')) || [];
+
+  // ========== 导出 ==========
+  function exportData() {
+    const data = {
+      bookmarks: bookmarks,
+      history: historyLog,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bookmarks-backup.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('已导出备份文件');
+  }
+
+  // ========== 导入 ==========
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.bookmarks && Array.isArray(data.bookmarks)) {
+          localStorage.setItem('bookmarks', JSON.stringify(data.bookmarks));
+          if (data.history) {
+            localStorage.setItem('bookmarkHistory', JSON.stringify(data.history));
+          }
+          // 刷新本地变量
+          bookmarks = data.bookmarks;
+          historyLog = data.history || [];
+          showToast('导入成功');
+          renderHistory(); // 更新日志显示
+        } else {
+          showToast('文件格式错误');
+        }
+      } catch (err) {
+        showToast('无法解析文件');
+      }
+      event.target.value = ''; // 重置 input
+    };
+    reader.readAsText(file);
+  }
+
+  // ========== 日志 ==========
+  function toggleHistory() {
+    const container = document.getElementById('historyContainer');
+    if (container.style.display === 'block') {
+      container.style.display = 'none';
+    } else {
+      renderHistory();
+      container.style.display = 'block';
+    }
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    if (historyLog.length === 0) {
+      list.innerHTML = '<div class="empty">暂无操作记录</div>';
+      return;
+    }
+    list.innerHTML = historyLog.map(entry => {
+      let text = `[${entry.time}] `;
+      switch (entry.action) {
+        case 'add': text += `✅ 添加「${entry.name}」`; break;
+        case 'delete': text += `❌ 删除「${entry.name}」`; break;
+        case 'edit': text += `✏️ 修改「${entry.oldName}」→「${entry.newName}」`; break;
+        case 'batch_delete': text += `🗑️ 批量删除 ${entry.count} 项`; break;
+        case 'import': text += `📥 导入 ${entry.count} 项`; break;
+        case 'clear_all': text += `🧹 清空所有数据`; break;
+        default: text += `${entry.action}`;
+      }
+      return `<div class="history-item">${text}</div>`;
+    }).join('');
+  }
+
+  // ========== 清空 ==========
+  function confirmClearAll() {
+    if (confirm('确定清空所有快捷方式和操作日志？此操作不可恢复！')) {
+      localStorage.removeItem('bookmarks');
+      localStorage.removeItem('bookmarkHistory');
+      bookmarks = [];
+      historyLog = [];
+      showToast('已清空所有数据');
+      renderHistory();
+    }
+  }
+
+  // 初始化日志
+  renderHistory();
+</script>
+
+</body>
+</html>
