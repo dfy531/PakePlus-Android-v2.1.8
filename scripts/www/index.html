@@ -1,11 +1,660 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+    body {
+      background: #f5f6f8;
+      color: #1d1d1f;
+      min-height: 100vh;
+      padding-top: 60px;
+      padding-bottom: 80px; /* ← 确保底部有空白可点击 */
+      position: relative;
+       padding-bottom: 70px;
+    }
+
+    /* 顶部导航栏 */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: #007aff;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .navbar h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .edit-btn, .done-btn, .delete-count {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 17px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 8px;
+    }
+    .delete-count {
+      background: rgba(255,255,255,0.2);
+    }
+    .done-btn {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* 链接列表 */
+    #list {
+      list-style: none;
+      padding: 20px 16px 0;
+    }
+    .item {
+      position: relative;
+      height: 72px;
+      background: white;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    .item.selected {
+      background: #f0f8ff;
+    }
+    .favicon {
+      width: 28px;
+      height: 28px;
+      margin-right: 16px;
+      border-radius: 6px;
+      background: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #666;
+      flex-shrink: 0;
+    }
+    .checkbox {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+      margin-right: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      flex-shrink: 0;
+    }
+    .checkbox.checked {
+      background: #007aff;
+      border-color: #007aff;
+    }
+    .checkbox.checked::after {
+      content: "✓";
+      color: white;
+      font-size: 16px;
+    }
+    .item a, .item .name-text {
+      flex: 1;
+      font-size: 18px;
+      color: #1d1d1f;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 12px 0;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 80px;
+      height: 100%;
+      background: #ff3b30;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+    }
+    .item.swiped .delete-btn {
+      transform: translateX(0);
+    }
+    .item.swiped a,
+    .item.swiped .favicon,
+    .item.swiped .name-text {
+      transform: translateX(-80px);
+      transition: transform 0.25s ease;
+    }
+
+    /* 添加按钮（FAB） */
+    .fab {
+      position: fixed;
+      bottom: 84px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      background: #007aff;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,122,255,0.4);
+      z-index: 90;
+    }
+
+    /* 模态框通用 */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.3);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      z-index: 490;
+    }
+    .overlay.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* 添加表单 */
+    .modal {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      padding: 24px;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      z-index: 500;
+    }
+    .modal.show {
+      transform: translateY(0);
+    }
+    .modal input {
+      width: 100%;
+      padding: 14px;
+      font-size: 17px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+    }
+    .modal-buttons button {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 500;
+    }
+    .cancel { background: #f0f0f0; color: #333; }
+    .confirm { background: #007aff; color: white; }
+
+    /* 删除确认面板 */
+    .action-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+      z-index: 510;
+    }
+    .action-sheet.show {
+      transform: translateY(0);
+    }
+    .action-sheet-content {
+      background: white;
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+      padding: 12px 16px 24px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    }
+    .action-sheet button {
+      width: 100%;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: 500;
+      border: none;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      outline: none;
+    }
+    .delete-option { color: #ff3b30; background: #fff; }
+    .cancel-option { color: #666; background: #f0f0f0; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.9);
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 16px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    .tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: white;
+  display: flex;
+  border-top: 1px solid #e0e0e0;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  z-index: 90;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #888;
+  font-size: 12px;
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+
+.tab-item.active {
+  color: #007aff;
+}
+
+.tab-item div:first-child {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+  </style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="navbar" id="navbar">
+  <h1>快捷方式</h1>
+  <button class="edit-btn" onclick="enterEditMode()">编辑</button>
+</div>
+
+<!-- 链接列表 -->
+<ul id="list"></ul>
+
+<!-- 添加按钮 -->
+<button class="fab" onclick="showAddModal()">＋</button>
+
+<!-- 添加模态框 -->
+<div class="overlay" id="addOverlay"></div>
+<div class="modal" id="addModal">
+  <h2 style="text-align:center;margin-bottom:20px;">添加快捷方式</h2>
+  <input type="text" id="nameInput" placeholder="名称（如：微博）" autocomplete="off" />
+  <input type="url" id="urlInput" placeholder="网址（如：https://weibo.com）" autocomplete="off" />
+  <div class="modal-buttons">
+    <button class="cancel" onclick="hideAddModal()">取消</button>
+    <button class="confirm" onclick="addLink()">添加</button>
+  </div>
+</div>
+
+<!-- 删除确认面板 -->
+<div class="overlay" id="deleteOverlay"></div>
+<div class="action-sheet" id="deleteSheet">
+  <div class="action-sheet-content" id="deleteSheetContent">
+    <!-- 动态内容 -->
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">请输入内容</div>
+
+<!-- 编辑模态框 -->
+<div class="overlay" id="editOverlay"></div>
+<div class="modal" id="editModal">
+  <h2 id="editTitle" style="text-align:center;margin-bottom:20px;">编辑快捷方式</h2>
+  <input type="text" id="editNameInput" placeholder="名称（如：微博）" autocomplete="off" />
+  <input type="url" id="editUrlInput" placeholder="网址（如：https://weibo.com）" autocomplete="off" />
+  <div class="modal-buttons">
+    <button class="cancel" onclick="hideEditModal()">取消</button>
+    <button class="confirm" onclick="saveEdit()">保存</button>
+  </div>
+</div>
+
+
+<!-- 底部导航栏 -->
+<div class="tab-bar">
+  <a href="index.html" class="tab-item active">
+    <div>🏠</div>
+    <div>首页</div>
+  </a>
+  <a href="settings.html" class="tab-item">
+    <div>⚙️</div>
+    <div>设置</div>
+  </a>
+</div>
+<script>
+  let bookmarks = JSON.parse(localStorage.getItem('bookmarks')) || [];
+  let editMode = false;
+  let selectedIndices = new Set();
+  let pendingDeleteIndex = null;
+  let startX = 0;
+  let currentElement = null;
+
+  // ========== 提示 ==========
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  // ========== 导航栏 ==========
+  function updateNavbar() {
+    const navbar = document.getElementById('navbar');
+    if (editMode) {
+      const deleteBtn = selectedIndices.size > 0
+        ? `<button class="delete-count" onclick="batchDelete()">删除(${selectedIndices.size})</button>`
+        : `<div></div>`;
+      navbar.innerHTML = `
+        ${deleteBtn}
+        <h1>快捷方式</h1>
+        <button class="done-btn" onclick="exitEditMode()">完成</button>
+      `;
+    } else {
+      navbar.innerHTML = `
+        <h1>快捷方式</h1>
+        <button class="edit-btn" onclick="enterEditMode()">编辑</button>
+      `;
+    }
+  }
+
+  // ========== 编辑模式 ==========
+  function enterEditMode() {
+    editMode = true;
+    selectedIndices.clear();
+    updateNavbar();
+    render();
+  }
+
+  function exitEditMode() {
+    editMode = false;
+    selectedIndices.clear();
+    updateNavbar();
+    render();
+  }
+
+  function toggleSelect(index) {
+    if (selectedIndices.has(index)) {
+      selectedIndices.delete(index);
+    } else {
+      selectedIndices.add(index);
+    }
+    updateNavbar();
+    render();
+  }
+
+  // ========== 渲染 ==========
+  function render() {
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+    bookmarks.forEach((b, i) => {
+      const url = b.url.startsWith('http') ? b.url : 'http://' + b.url;
+      const isSelected = selectedIndices.has(i);
+      const li = document.createElement('li');
+      li.className = 'item' + (isSelected ? ' selected' : '');
+
+      if (editMode) {
+        li.innerHTML = `
+          <div class="checkbox${isSelected ? ' checked' : ''}" onclick="toggleSelect(${i})"></div>
+          <div class="name-text">${b.name}</div>
+        `;
+      } else {
+  li.dataset.index = i;
+  li.innerHTML = `
+    <div class="favicon">🌐</div>
+    <a href="${url}" target="_blank" class="link-item" data-index="${i}">${b.name}</a>
+    <div class="delete-btn" onclick="handleDeleteClick(event, ${i})">删除</div>
+  `;
+  // 绑定长按事件
+  const linkEl = li.querySelector('.link-item');
+  linkEl.addEventListener('touchstart', function(e) {
+    if (editMode) return;
+    const idx = parseInt(this.dataset.index);
+    longPressTimer = setTimeout(() => {
+      showEditModal(idx);
+    }, 500);
+  });
+  linkEl.addEventListener('touchend', () => clearTimeout(longPressTimer));
+  linkEl.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+}
+      list.appendChild(li);
+    });
+  }
+
+  // ========== 添加 ==========
+  function showAddModal() {
+    document.getElementById('addOverlay').classList.add('show');
+    document.getElementById('addModal').classList.add('show');
+    document.getElementById('nameInput').focus();
+  }
+
+  function hideAddModal() {
+    document.getElementById('addOverlay').classList.remove('show');
+    document.getElementById('addModal').classList.remove('show');
+    document.getElementById('nameInput').value = '';
+    document.getElementById('urlInput').value = '';
+  }
+
+  function addLink() {
+    const name = document.getElementById('nameInput').value.trim();
+    const url = document.getElementById('urlInput').value.trim();
+    if (!name || !url) {
+      showToast('请填写名称和网址');
+      return;
+    }
+    bookmarks.push({ name, url });
+    save();
+    hideAddModal();
+  }
+
+  // ========== 删除 ==========
+  function handleDeleteClick(event, index) {
+    event.stopPropagation();
+    pendingDeleteIndex = index;
+    showDeleteConfirm(false);
+  }
+
+  function batchDelete() {
+    if (selectedIndices.size === 0) return;
+    showDeleteConfirm(true);
+  }
+
+  function showDeleteConfirm(isBatch) {
+    const content = document.getElementById('deleteSheetContent');
+    if (isBatch) {
+      content.innerHTML = `
+        <div style="padding:12px;color:#333;font-weight:500;text-align:center">
+          确定删除选中的 ${selectedIndices.size} 项？
+        </div>
+        <button class="delete-option" id="deleteConfirmBtn">删除</button>
+        <button class="cancel-option" onclick="hideDeleteSheet()">取消</button>
+      `;
+    } else {
+      const name = bookmarks[pendingDeleteIndex]?.name || '该项';
+      content.innerHTML = `
+        <div style="padding:12px;color:#333;font-weight:500;text-align:center">
+          确定删除「${name}」？
+        </div>
+        <button class="delete-option" id="deleteConfirmBtn">删除</button>
+        <button class="cancel-option" onclick="hideDeleteSheet()">取消</button>
+      `;
+    }
+    document.getElementById('deleteConfirmBtn').onclick = () => executeDelete(isBatch);
+    document.getElementById('deleteOverlay').classList.add('show');
+    document.getElementById('deleteSheet').classList.add('show');
+  }
+
+  function hideDeleteSheet() {
+    document.getElementById('deleteOverlay').classList.remove('show');
+    document.getElementById('deleteSheet').classList.remove('show');
+    pendingDeleteIndex = null;
+  }
+
+  function executeDelete(isBatch) {
+    if (isBatch) {
+      Array.from(selectedIndices).sort((a, b) => b - a).forEach(idx => {
+        bookmarks.splice(idx, 1);
+      });
+      exitEditMode();
+    } else if (pendingDeleteIndex !== null) {
+      bookmarks.splice(pendingDeleteIndex, 1);
+      pendingDeleteIndex = null;
+    }
+    save();
+    hideDeleteSheet();
+  }
+
+  // ========== 全局交互 ==========
+  function collapseAllSwiped() {
+    if (!editMode) {
+      document.querySelectorAll('.item.swiped').forEach(item => {
+        item.style.transform = '';
+        item.classList.remove('swiped');
+      });
+    }
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.item') && !editMode) {
+      collapseAllSwiped();
+    }
+  });
+
+  // 触摸滑动（仅在非编辑模式）
+  document.addEventListener('touchstart', e => {
+    if (!editMode && e.target.closest('.item')) {
+      startX = e.touches[0].clientX;
+      currentElement = e.target.closest('.item');
+    }
+  });
+
+  document.addEventListener('touchmove', e => {
+    if (!currentElement || editMode) return;
+    const moveX = e.touches[0].clientX;
+    const diff = startX - moveX;
+    if (diff > 10 && diff <= 80) {
+      currentElement.style.transform = `translateX(${-diff}px)`;
+    }
+  });
+
+  document.addEventListener('touchend', () => {
+    if (!currentElement || editMode) return;
+    const computed = getComputedStyle(currentElement);
+    const matrix = new WebKitCSSMatrix(computed.transform || computed.webkitTransform);
+    const translateX = matrix.m41;
+    if (translateX <= -40) {
+      currentElement.classList.add('swiped');
+    } else {
+      currentElement.style.transform = '';
+      currentElement.classList.remove('swiped');
+    }
+    currentElement = null;
+  });
+
+  // 蒙层点击关闭
+  document.getElementById('addOverlay').addEventListener('click', hideAddModal);
+  document.getElementById('deleteOverlay').addEventListener('click', hideDeleteSheet);
+  document.getElementById('editOverlay').addEventListener('click', hideEditModal);
+
+  // 初始化
+  function save() {
+    localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+    render();
+  }
+  updateNavbar();
+  render();
+
+
+  let longPressTimer = null;
+let currentLongPressIndex = null;
+
+function showEditModal(index) {
+  const item = bookmarks[index];
+  document.getElementById('editNameInput').value = item.name;
+  document.getElementById('editUrlInput').value = item.url;
+  document.getElementById('editOverlay').classList.add('show');
+  document.getElementById('editModal').classList.add('show');
+  document.getElementById('editNameInput').focus();
+  currentLongPressIndex = index;
+}
+
+function hideEditModal() {
+  document.getElementById('editOverlay').classList.remove('show');
+  document.getElementById('editModal').classList.remove('show');
+  currentLongPressIndex = null;
+}
+
+function saveEdit() {
+  const name = document.getElementById('editNameInput').value.trim();
+  const url = document.getElementById('editUrlInput').value.trim();
+  if (!name || !url) {
+    showToast('请填写名称和网址');
+    return;
+  }
+  if (currentLongPressIndex !== null) {
+    bookmarks[currentLongPressIndex] = { name, url };
+    save();
+    hideEditModal();
+  }
+}
+
+</script>
+
+</body>
 </html>
